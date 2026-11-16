@@ -12,6 +12,8 @@
   header h1{font-size:22px;margin:8px 0 6px}
   header p{margin:0;color:var(--sub);font-size:14px;line-height:1.6}
   .notice{white-space:pre-line;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:12px;padding:14px 16px;margin:10px 0 12px;font-size:14px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}
+  .close-info{margin:6px 0 0;font-size:15px;font-weight:700;color:var(--tx)}
+  .close-info:empty{display:none}
   .notice a{color:#b91c1c;font-weight:700;text-decoration:underline}
   .card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:18px;margin-top:16px}
   .card h2{font-size:16px;margin:0 0 14px;display:flex;align-items:center;gap:8px}
@@ -83,7 +85,8 @@
 문의: 동서대학교 사회봉사센터 <a href="tel:051-320-2044">051-320-2044</a>
 
 ※ 입력하신 개인정보(이름, 학번, 학과, 연락처)는 면접 일정 조율 목적으로만 사용되며, 면접 종료 후 삭제됩니다.</div>
-    <p>면접 기간: 11월 23일(월) ~ 27일(금) · 13:20 ~ 17:00<br>20분 단위 · 시간대별 4명 · 1인 1회 예약</p>
+    <p>면접 기간: 11월 23일(월) ~ 27일(금) · 13:20 ~ 17:00<br>20분 단위 · 시간대별 4명(17:00 이후 8명) · 1인 1회 예약</p>
+    <p class="close-info" id="closeInfo"></p>
   </header>
   <div class="banner" id="banner"></div>
 
@@ -163,7 +166,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const md = d => { const [, m, dd] = d.split('-').map(Number); return m + '/' + dd; };
 const digits = s => String(s || '').replace(/\D/g, '');
-const isUnlimited = t => !!(S && S.extraSlot && S.extraSlot.unlimited && t === S.extraSlot.key);
+// 칸별 정원은 서버 getState.slots 에서 받는다
+const capOf = t => { const s = S && S.slots && S.slots.find(x => x.key === t); return s ? s.capacity : S.capacity; };
 
 // /api/[action] 호출. 성공 시 data 반환, 실패 시 한글 메시지로 throw
 async function run(action, payload, opts = {}) {
@@ -187,9 +191,9 @@ async function refresh(silent, fresh) {
   try {
     S = await run('getState', null, { get: true, fresh });
     if (!sel.date) sel.date = S.dates[0].date;
-    if (sel.time && !isUnlimited(sel.time)) {
+    if (sel.time) {
       const n = S.counts[sel.date + '|' + sel.time] || 0;
-      if (n >= S.capacity) { sel.time = null; toast('선택한 시간이 방금 마감되었습니다. 다른 시간을 골라주세요.', true); }
+      if (n >= capOf(sel.time)) { sel.time = null; toast('선택한 시간이 방금 마감되었습니다. 다른 시간을 골라주세요.', true); }
     }
     render();
   } catch (e) { if (!silent) toast('불러오기 실패: ' + e.message, true); }
@@ -202,25 +206,19 @@ function render() {
   else b.style.display = 'none';
 
   $('days').innerHTML = S.dates.map(d => {
-    const left = S.times.reduce((a, t) => a + Math.max(0, S.capacity - (S.counts[d.date + '|' + t] || 0)), 0);
+    const left = S.slots.reduce((a, s) => a + Math.max(0, s.capacity - (S.counts[d.date + '|' + s.key] || 0)), 0);
     return `<button class="day ${d.date === sel.date ? 'on' : ''} ${left === 0 ? 'full' : ''}" onclick="pickDay('${d.date}')">
       <b>${md(d.date)} (${d.dow})</b><small>${left === 0 ? '마감' : '잔여 ' + left + '석'}</small></button>`;
   }).join('');
 
   const open = S.status === 'open';
-  $('times').innerHTML = S.times.map(t => {
-    const n = S.counts[sel.date + '|' + t] || 0, left = S.capacity - n, full = left <= 0;
-    const on = sel.time === t;
-    return `<button class="slot ${on ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${t}')">
-      ${t}<small>${full ? '마감' : '잔여 ' + left + ' / ' + S.capacity}</small></button>`;
+  $('closeInfo').textContent = S.closeLabel ? '예약 마감: ' + S.closeLabel : '';
+  // 칸 목록·칸별 정원은 서버가 정한다 (추가 칸 '17:00 이후 가능'은 점선 스타일)
+  $('times').innerHTML = S.slots.map(s => {
+    const n = S.counts[sel.date + '|' + s.key] || 0, left = s.capacity - n, full = left <= 0;
+    return `<button class="slot ${s.extra ? 'extra' : ''} ${sel.time === s.key ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${esc(s.key)}')">
+      ${esc(s.label)}<small>${full ? '마감' : '잔여 ' + left + ' / ' + s.capacity}</small></button>`;
   }).join('');
-  // 추가 칸(예: 17:00 이후 가능): 정원 제한이 없으면 마감되지 않음. 오픈/마감 시각만 적용
-  const x = S.extraSlot;
-  if (x) {
-    const n = S.counts[sel.date + '|' + x.key] || 0, full = !x.unlimited && n >= S.capacity;
-    $('times').innerHTML += `<button class="slot extra ${sel.time === x.key ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${esc(x.key)}')">
-      ${esc(x.label)}<small>${x.unlimited ? '인원 제한 없음' : full ? '마감' : '잔여 ' + (S.capacity - n) + ' / ' + S.capacity}</small></button>`;
-  }
 
   const d = S.dates.find(x => x.date === sel.date);
   if (sel.time) { $('selText').innerHTML = '선택: <b>' + md(sel.date) + ' (' + d.dow + ') ' + sel.time + '</b>'; }

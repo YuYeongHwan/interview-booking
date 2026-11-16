@@ -70,6 +70,8 @@ const globals = {
 
 const ctx = vm.createContext(globals);
 vm.runInContext(fs.readFileSync(path.join(process.cwd(), 'apps-script/Code.gs'), 'utf8'), ctx);
+// 테스트용 현재 시각 주입: MOCK_NOW=2026-11-20T13:00:01+09:00 → 마감 후 상태
+if (process.env.MOCK_NOW) ctx.now_ = () => new Date(process.env.MOCK_NOW);
 
 export function callMock(body) {
   const out = ctx.doPost({ postData: { contents: JSON.stringify({ ...body, secret: 'mock' }) } });

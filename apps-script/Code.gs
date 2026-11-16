@@ -7,9 +7,9 @@ const CONFIG = {
   INTERVAL_MIN: 20,        // 간격(분)
   CAPACITY: 4,             // 시간대당 정원
   // 각 날짜 마지막에 붙는 추가 칸. key는 시트 '면접시간' 열에 저장되는 값. 필요 없으면 null.
-  EXTRA_SLOT: { key: '17:00 이후', label: '17:00 이후 가능', unlimited: true },
+  EXTRA_SLOT: { key: '17:00 이후', label: '17:00 이후 가능', capacity: 8 },
   OPEN_AT: '',             // 예약 오픈 시각. 예: '2026-11-18T18:00:00+09:00' (비우면 즉시 오픈)
-  CLOSE_AT: '',            // 예약 마감 시각. 예: '2026-11-21T23:59:59+09:00' (비우면 마감 없음)
+  CLOSE_AT: '2026-11-20T13:00:00+09:00',  // 예약 마감 시각 (비우면 마감 없음). 반드시 +09:00 형식
   SHEET: '예약명단',
   SORTED_SHEET: '시간순명단'
 };
@@ -89,7 +89,11 @@ function times_() {
 function slots_() {
   return CONFIG.EXTRA_SLOT ? times_().concat(CONFIG.EXTRA_SLOT.key) : times_();
 }
-const isUnlimited_ = time => !!(CONFIG.EXTRA_SLOT && CONFIG.EXTRA_SLOT.unlimited && time === CONFIG.EXTRA_SLOT.key);
+const isExtra_ = time => !!(CONFIG.EXTRA_SLOT && time === CONFIG.EXTRA_SLOT.key);
+// 칸별 정원: 추가 칸은 EXTRA_SLOT.capacity, 나머지는 CAPACITY
+const capOf_ = time => (CONFIG.EXTRA_SLOT && time === CONFIG.EXTRA_SLOT.key ? CONFIG.EXTRA_SLOT.capacity : CONFIG.CAPACITY);
+// 테스트에서 현재 시각을 바꿀 수 있도록 분리 (mock의 MOCK_NOW)
+function now_() { return new Date(); }
 
 function dow_(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -159,7 +163,7 @@ function rows_(sh) {
 }
 
 function status_() {
-  const now = new Date();
+  const now = now_();
   if (CONFIG.OPEN_AT && now < new Date(CONFIG.OPEN_AT)) return 'before';
   if (CONFIG.CLOSE_AT && now > new Date(CONFIG.CLOSE_AT)) return 'closed';
   return 'open';
@@ -188,7 +192,10 @@ function getState() {
     dates: CONFIG.DATES.map(d => ({ date: d, dow: dow_(d) })),
     times: times_(),
     capacity: CONFIG.CAPACITY,
-    extraSlot: CONFIG.EXTRA_SLOT || null,   // 프론트가 각 날짜 마지막에 그린다
+    extraSlot: CONFIG.EXTRA_SLOT || null,
+    // 프론트는 이 목록으로 칸을 그린다 (칸별 정원 포함, 추가 칸은 맨 뒤)
+    slots: slots_().map(t => ({ key: t, label: isExtra_(t) ? CONFIG.EXTRA_SLOT.label : t, capacity: capOf_(t), extra: isExtra_(t) })),
+    closeLabel: CONFIG.CLOSE_AT ? fmt_(CONFIG.CLOSE_AT.slice(0, 10), CONFIG.CLOSE_AT.slice(11, 16)) : '',
     counts: countMap_(rows_(sheet_())),   // 인원 수만. 이름 등 개인정보는 절대 내보내지 않음
     status: status_(),
     openAt: CONFIG.OPEN_AT,
@@ -227,7 +234,7 @@ function reserve(form) {
       fail_(`이미 예약된 학번입니다. (${fmt_(dup.date, dup.time)})\n변경하려면 '내 예약 확인 / 취소'에서 취소 후 다시 예약해주세요.`);
     }
     const cnt = rows.filter(r => r.date === date && r.time === time).length;
-    if (!isUnlimited_(time) && cnt >= CONFIG.CAPACITY) fail_('방금 해당 시간이 마감되었습니다. 다른 시간을 선택해주세요.');
+    if (cnt >= capOf_(time)) fail_('방금 해당 시간이 마감되었습니다. 다른 시간을 선택해주세요.');
 
     const rec = {
       ts: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'),
@@ -287,7 +294,7 @@ function adminData(pw) {
   return {
     rows: sorted,
     total: sorted.length,
-    capacityTotal: CONFIG.DATES.length * times_().length * CONFIG.CAPACITY,
+    capacityTotal: CONFIG.DATES.length * slots_().reduce((a, t) => a + capOf_(t), 0),
     exportUrl: `https://docs.google.com/spreadsheets/d/${ss.getId()}/export?format=xlsx`,
     sheetUrl: ss.getUrl()
   };

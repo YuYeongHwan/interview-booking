@@ -1,6 +1,6 @@
 // 동시성 테스트. 끝나면 만든 예약을 cancel로 정리한다. (테스트 학번은 9999로 시작)
 //  A. 정원 있는 칸: 서로 다른 학번 10건 동시 → 정확히 (정원-기존인원)건만 성공
-//  B. 추가 칸(17:00 이후 가능, 정원 없음): 서로 다른 학번 10건 동시 → 10건 모두 성공
+//  B. 추가 칸(17:00 이후 가능, 정원 8): 서로 다른 학번 10건 동시 → 정확히 (정원-기존인원)건만 성공
 //  C. 같은 학번: 5건 동시 → 1건만 성공, 이후 다른 칸 예약도 중복으로 거부
 //
 //   Vercel/로컬 API 경유:   BASE_URL=http://localhost:3000 node scripts/race-test.js
@@ -57,15 +57,16 @@ try {
   const afterA = (await state()).counts[date + '|' + time] || 0;
   check('A 정원 칸', okA === expected && afterA === before + expected, `성공 ${okA}/기대 ${expected}, 시트 ${afterA}명`);
 
-  // B. 추가 칸 (정원 제한 없음)
-  const x = S.extraSlot;
-  if (!x || !x.unlimited) console.log('\n[B] 정원 없는 추가 칸이 설정되지 않아 건너뜀');
+  // B. 추가 칸 (칸별 정원, 예: 8명)
+  const x = (S.slots || []).find(s => s.extra);
+  if (!x) console.log('\n[B] 추가 칸이 설정되지 않아 건너뜀');
   else {
     const xd = S.dates[S.dates.length - 1].date, xb = S.counts[xd + '|' + x.key] || 0;
-    console.log(`\n[B] 추가 칸 ${xd} ${x.key} (기존 ${xb}명, 정원 없음)`);
+    const xe = Math.min(N, Math.max(0, x.capacity - xb));
+    console.log(`\n[B] 추가 칸 ${xd} ${x.key} (기존 ${xb}명, 정원 ${x.capacity}) → 기대 성공 ${xe}건`);
     const okB = await burst(Array.from({ length: N }, (_, i) => person(100 + i)), xd, x.key);
     const afterB = (await state()).counts[xd + '|' + x.key] || 0;
-    check('B 정원 없는 칸', okB === N && afterB === xb + N, `성공 ${okB}/${N}, 시트 ${afterB}명`);
+    check(`B 추가 칸 정원 ${x.capacity}`, okB === xe && afterB === xb + xe, `성공 ${okB}/기대 ${xe}, 시트 ${afterB}명`);
   }
 
   // C. 같은 학번 중복
