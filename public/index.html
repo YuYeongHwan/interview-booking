@@ -92,10 +92,10 @@
     <div class="card">
       <h2><span class="step">1</span>지원자 정보</h2>
       <div class="grid2">
-        <div><label>이름</label><input id="name" placeholder="홍길동" autocomplete="name"></div>
-        <div><label>학번</label><input id="sid" placeholder="20231234" inputmode="numeric"></div>
-        <div><label>학과</label><input id="major" placeholder="컴퓨터공학과"></div>
-        <div><label>연락처</label><input id="phone" placeholder="010-1234-5678" inputmode="tel"></div>
+        <div><label>이름</label><input id="name" placeholder="ex) 홍길동" autocomplete="name"></div>
+        <div><label>학번</label><input id="sid" placeholder="ex) 20231234" inputmode="numeric"></div>
+        <div><label>학과</label><input id="major" placeholder="ex) 컴퓨터공학과"></div>
+        <div><label>연락처</label><input id="phone" placeholder="ex) 010-1234-5678" inputmode="numeric" maxlength="13" autocomplete="tel"></div>
       </div>
     </div>
 
@@ -109,8 +109,8 @@
     <div class="card">
       <h2>내 예약 확인 / 취소</h2>
       <div class="row">
-        <div><label>학번</label><input id="qSid" inputmode="numeric"></div>
-        <div><label>연락처</label><input id="qPhone" inputmode="tel"></div>
+        <div><label>학번</label><input id="qSid" placeholder="ex) 20231234" inputmode="numeric"></div>
+        <div><label>연락처</label><input id="qPhone" placeholder="ex) 010-1234-5678" inputmode="numeric" maxlength="13"></div>
         <button class="btn ghost" onclick="doLookup()">조회</button>
       </div>
       <div class="result" id="qResult"></div>
@@ -323,6 +323,31 @@ async function loadAdmin() {
       <tbody>${r.rows.map(x => '<tr>' + x.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('')}</tbody></table></div>`;
   } catch (e) { $('adminOut').innerHTML = ''; toast(e.message, true); }
 }
+
+// 연락처 자동 하이픈: 01012345678 → 010-1234-5678, 0101234567 → 010-123-4567
+function fmtPhone(d) {
+  if (d.length < 4) return d;
+  if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3);
+  if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+  return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7);
+}
+function bindPhone(el) {
+  let prev = digits(el.value);
+  el.addEventListener('input', e => {
+    // 커서 위치를 '앞에 있는 숫자 개수'로 기억했다가 포맷 후 같은 자리로 되돌린다
+    let k = digits(el.value.slice(0, el.selectionStart ?? el.value.length)).length;
+    let d = digits(el.value);
+    // 하이픈만 지워진 경우(숫자 변화 없음) 그 옆 숫자를 지워서 커서가 막히지 않게 한다
+    if (d === prev && e.inputType === 'deleteContentBackward' && k > 0) { d = d.slice(0, k - 1) + d.slice(k); k--; }
+    else if (d === prev && e.inputType === 'deleteContentForward') d = d.slice(0, k) + d.slice(k + 1);
+    d = d.slice(0, 11); k = Math.min(k, d.length);
+    el.value = fmtPhone(d); prev = d;
+    let i = 0;
+    for (let n = 0; i < el.value.length && n < k; i++) if (/\d/.test(el.value[i])) n++;
+    if (document.activeElement === el) el.setSelectionRange(i, i);
+  });
+}
+bindPhone($('phone')); bindPhone($('qPhone'));
 
 refresh();
 setInterval(() => { if (!document.hidden && !busy && $('modal').style.display !== 'flex') refresh(true); }, 15000);
