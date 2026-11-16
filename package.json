@@ -1,0 +1,10 @@
+{
+  "name": "interview-booking",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "vercel dev",
+    "race": "node scripts/race-test.js"
+  }
+}

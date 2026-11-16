@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>국제기술봉사단 면접 일정 예약</title>
+<style>
+  :root{--p:#1a56db;--pl:#e8effd;--bd:#e5e7eb;--tx:#111827;--sub:#6b7280;--red:#dc2626;--ok:#059669}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#f5f7fb;color:var(--tx);padding-bottom:96px}
+  .wrap{max-width:720px;margin:0 auto;padding:20px 16px}
+  header h1{font-size:22px;margin:8px 0 6px}
+  header p{margin:0;color:var(--sub);font-size:14px;line-height:1.6}
+  .card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:18px;margin-top:16px}
+  .card h2{font-size:16px;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+  .step{background:var(--p);color:#fff;border-radius:50%;width:22px;height:22px;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  label{font-size:13px;color:var(--sub);display:block;margin-bottom:4px}
+  input{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:10px;font-size:16px}
+  input:focus{outline:2px solid var(--p);border-color:transparent}
+  .days{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .day{flex:1;min-width:92px;border:1px solid var(--bd);background:#fff;border-radius:12px;padding:10px 6px;cursor:pointer;text-align:center}
+  .day b{display:block;font-size:15px}
+  .day small{color:var(--sub);font-size:12px}
+  .day.on{border-color:var(--p);background:var(--pl)}
+  .day.on b{color:var(--p)}
+  .day.full small{color:var(--red)}
+  .times{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:14px}
+  .slot{border:1px solid var(--bd);background:#fff;border-radius:12px;padding:12px 8px;cursor:pointer;text-align:center;font-size:15px;font-weight:600;color:var(--tx)}
+  .slot small{display:block;font-weight:400;font-size:12px;color:var(--sub);margin-top:3px}
+  .slot:hover:not(:disabled){border-color:var(--p)}
+  .slot.on{background:var(--p);border-color:var(--p);color:#fff}
+  .slot.on small{color:#dbe6ff}
+  .slot:disabled{background:#f3f4f6;color:#b6bcc6;cursor:not-allowed;text-decoration:line-through}
+  .slot:disabled small{text-decoration:none;color:var(--red)}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--bd);padding:12px 16px}
+  .bar .in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  .bar .sel{flex:1;font-size:14px;color:var(--sub)}
+  .bar .sel b{color:var(--tx);font-size:15px}
+  .btn{background:var(--p);color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+  .btn:disabled{background:#9ca3af;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--p);border:1px solid var(--p)}
+  .btn.red{background:var(--red)}
+  .banner{border-radius:10px;padding:12px 14px;margin-top:16px;font-size:14px;background:#fef3c7;color:#92400e;display:none}
+  .muted{color:var(--sub);font-size:13px}
+  .done{text-align:center;padding:36px 18px}
+  .done .big{font-size:20px;font-weight:700;margin:10px 0}
+  .done .slotlabel{display:inline-block;background:var(--pl);color:var(--p);font-weight:700;border-radius:10px;padding:10px 16px;font-size:18px;margin:8px 0 14px}
+  .row{display:flex;gap:8px;align-items:flex-end}
+  .row>div{flex:1}
+  .result{margin-top:12px;font-size:14px}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+  .modal .box{background:#fff;border-radius:14px;padding:22px;max-width:380px;width:100%}
+  .modal h3{margin:0 0 12px}
+  .modal .info{background:#f9fafb;border-radius:10px;padding:12px;font-size:14px;line-height:1.8;margin-bottom:16px}
+  .modal .acts{display:flex;gap:8px;justify-content:flex-end}
+  .toast{position:fixed;left:50%;top:20px;transform:translateX(-50%);background:#111827;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;display:none;z-index:20;max-width:90%;white-space:pre-line;text-align:center}
+  .toast.err{background:var(--red)}
+  footer{text-align:center;margin-top:24px}
+  footer a{color:#9ca3af;font-size:12px;cursor:pointer}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+  th,td{border-bottom:1px solid var(--bd);padding:7px 6px;text-align:left;white-space:nowrap}
+  th{background:#f9fafb}
+  .tbl{overflow-x:auto;max-height:480px;overflow-y:auto}
+  .loading{color:var(--sub);text-align:center;padding:30px 0}
+  @media(max-width:480px){.grid2{grid-template-columns:1fr}.row{flex-wrap:wrap}.row>div{flex:1 1 40%}.row>.btn{flex:1 1 100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">국제기술봉사단 면접 일정 예약</h1>
+    <p>면접 기간: 11월 23일(월) ~ 27일(금) · 13:20 ~ 17:00<br>20분 단위 · 시간대별 4명 · 1인 1회 예약</p>
+  </header>
+  <div class="banner" id="banner"></div>
+
+  <!-- 예약 화면 -->
+  <div id="mainView">
+    <div class="card">
+      <h2><span class="step">1</span>지원자 정보</h2>
+      <div class="grid2">
+        <div><label>이름</label><input id="name" placeholder="홍길동" autocomplete="name"></div>
+        <div><label>학번</label><input id="sid" placeholder="20231234" inputmode="numeric"></div>
+        <div><label>학과</label><input id="major" placeholder="컴퓨터공학과"></div>
+        <div><label>연락처</label><input id="phone" placeholder="010-1234-5678" inputmode="tel"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span>면접 시간 선택</h2>
+      <div class="days" id="days"></div>
+      <div class="times" id="times"><div class="loading">불러오는 중…</div></div>
+      <p class="muted" style="margin-top:12px">※ 잔여 인원은 자동으로 갱신됩니다. 회색 시간은 마감된 시간입니다.</p>
+    </div>
+
+    <div class="card">
+      <h2>내 예약 확인 / 취소</h2>
+      <div class="row">
+        <div><label>학번</label><input id="qSid" inputmode="numeric"></div>
+        <div><label>연락처</label><input id="qPhone" inputmode="tel"></div>
+        <button class="btn ghost" onclick="doLookup()">조회</button>
+      </div>
+      <div class="result" id="qResult"></div>
+    </div>
+  </div>
+
+  <!-- 완료 화면 -->
+  <div id="doneView" class="card done" style="display:none">
+    <div style="font-size:44px">✅</div>
+    <div class="big">예약이 완료되었습니다</div>
+    <div id="doneName" class="muted"></div>
+    <div class="slotlabel" id="doneSlot"></div>
+    <p class="muted">이 화면을 캡처해 두세요.<br>변경은 '내 예약 확인 / 취소'에서 취소 후 다시 예약하면 됩니다.</p>
+    <button class="btn ghost" onclick="backHome()">처음으로</button>
+  </div>
+
+  <!-- 관리자 -->
+  <div id="adminView" class="card" style="display:none">
+    <h2>관리자</h2>
+    <div class="row">
+      <div><label>관리자 비밀번호</label><input id="pw" type="password"></div>
+      <button class="btn" onclick="loadAdmin()">조회</button>
+    </div>
+    <div id="adminOut"></div>
+  </div>
+
+  <footer><a onclick="toggleAdmin()">관리자</a></footer>
+</div>
+
+<div class="bar" id="bar">
+  <div class="in">
+    <div class="sel" id="selText">시간을 선택해주세요</div>
+    <button class="btn" id="goBtn" disabled onclick="openConfirm()">예약하기</button>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box">
+  <h3 id="mTitle"></h3>
+  <div class="info" id="mInfo"></div>
+  <div class="acts">
+    <button class="btn ghost" onclick="closeModal()">취소</button>
+    <button class="btn" id="mOk">확인</button>
+  </div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+let S = null, sel = { date: null, time: null }, busy = false, lastQuery = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const md = d => { const [, m, dd] = d.split('-').map(Number); return m + '/' + dd; };
+const digits = s => String(s || '').replace(/\D/g, '');
+
+// /api/[action] 호출. 성공 시 data 반환, 실패 시 한글 메시지로 throw
+async function run(action, payload, opts = {}) {
+  let r, j;
+  try {
+    r = opts.get
+      ? await fetch('/api/' + action + (opts.fresh ? '?t=' + Date.now() : ''))
+      : await fetch('/api/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}) });
+    j = await r.json();
+  } catch (e) { throw new Error('네트워크 오류입니다. 잠시 후 다시 시도해주세요.'); }
+  if (!j.ok) throw new Error(j.error || '잠시 후 다시 시도해주세요.');
+  return j.data;
+}
+
+function toast(msg, err) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : '');
+  t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', err ? 4500 : 2500);
+}
+
+async function refresh(silent, fresh) {
+  try {
+    S = await run('getState', null, { get: true, fresh });
+    if (!sel.date) sel.date = S.dates[0].date;
+    if (sel.time) {
+      const n = S.counts[sel.date + '|' + sel.time] || 0;
+      if (n >= S.capacity) { sel.time = null; toast('선택한 시간이 방금 마감되었습니다. 다른 시간을 골라주세요.', true); }
+    }
+    render();
+  } catch (e) { if (!silent) toast('불러오기 실패: ' + e.message, true); }
+}
+
+function render() {
+  const b = $('banner');
+  if (S.status === 'before') { b.style.display = 'block'; b.textContent = '예약 오픈 전입니다. 오픈 시각: ' + S.openAt.replace('T', ' ').slice(0, 16); }
+  else if (S.status === 'closed') { b.style.display = 'block'; b.textContent = '예약이 마감되었습니다.'; }
+  else b.style.display = 'none';
+
+  $('days').innerHTML = S.dates.map(d => {
+    const left = S.times.reduce((a, t) => a + Math.max(0, S.capacity - (S.counts[d.date + '|' + t] || 0)), 0);
+    return `<button class="day ${d.date === sel.date ? 'on' : ''} ${left === 0 ? 'full' : ''}" onclick="pickDay('${d.date}')">
+      <b>${md(d.date)} (${d.dow})</b><small>${left === 0 ? '마감' : '잔여 ' + left + '석'}</small></button>`;
+  }).join('');
+
+  const open = S.status === 'open';
+  $('times').innerHTML = S.times.map(t => {
+    const n = S.counts[sel.date + '|' + t] || 0, left = S.capacity - n, full = left <= 0;
+    const on = sel.time === t;
+    return `<button class="slot ${on ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${t}')">
+      ${t}<small>${full ? '마감' : '잔여 ' + left + ' / ' + S.capacity}</small></button>`;
+  }).join('');
+
+  const d = S.dates.find(x => x.date === sel.date);
+  if (sel.time) { $('selText').innerHTML = '선택: <b>' + md(sel.date) + ' (' + d.dow + ') ' + sel.time + '</b>'; }
+  else $('selText').textContent = '시간을 선택해주세요';
+  $('goBtn').disabled = !sel.time || !open || busy;
+}
+
+function pickDay(d) { if (sel.date !== d) { sel.date = d; sel.time = null; } render(); }
+function pickTime(t) { sel.time = sel.time === t ? null : t; render(); }
+
+function getForm() {
+  const f = { name: $('name').value.trim(), studentId: digits($('sid').value), major: $('major').value.trim(), phone: digits($('phone').value) };
+  if (!f.name) return '이름을 입력해주세요.';
+  if (!/^\d{6,10}$/.test(f.studentId)) return '학번을 정확히 입력해주세요.';
+  if (!f.major) return '학과를 입력해주세요.';
+  if (!/^01\d{8,9}$/.test(f.phone)) return '연락처를 정확히 입력해주세요. (예: 010-1234-5678)';
+  return f;
+}
+
+function modal(title, html, okText, okClass, onOk) {
+  $('mTitle').textContent = title; $('mInfo').innerHTML = html;
+  const ok = $('mOk'); ok.textContent = okText; ok.className = 'btn ' + (okClass || '');
+  ok.disabled = false; ok.onclick = onOk; $('modal').style.display = 'flex';
+}
+function closeModal() { $('modal').style.display = 'none'; }
+
+function openConfirm() {
+  const f = getForm();
+  if (typeof f === 'string') { toast(f, true); return; }
+  const d = S.dates.find(x => x.date === sel.date);
+  modal('예약 정보를 확인해주세요',
+    `이름: <b>${esc(f.name)}</b><br>학번: ${esc(f.studentId)}<br>학과: ${esc(f.major)}<br>연락처: ${esc($('phone').value.trim())}<br>
+     면접: <b>${md(sel.date)} (${d.dow}) ${sel.time}</b>`,
+    '예약 확정', '', () => submit(f));
+}
+
+async function submit(f) {
+  if (busy) return;
+  busy = true; $('mOk').disabled = true; $('mOk').textContent = '처리 중…';
+  try {
+    const r = await run('reserve', Object.assign({}, f, { date: sel.date, time: sel.time }));
+    closeModal();
+    $('doneName').textContent = r.name + ' 님';
+    $('doneSlot').textContent = r.label;
+    $('mainView').style.display = 'none'; $('bar').style.display = 'none';
+    $('doneView').style.display = 'block'; window.scrollTo(0, 0);
+    sel.time = null;
+  } catch (e) {
+    closeModal(); toast(e.message, true);
+  } finally {
+    busy = false; refresh(true, true);
+  }
+}
+
+function backHome() {
+  ['name', 'sid', 'major', 'phone'].forEach(id => $(id).value = '');
+  $('doneView').style.display = 'none'; $('mainView').style.display = 'block'; $('bar').style.display = 'block';
+  refresh();
+}
+
+async function doLookup() {
+  const sid = digits($('qSid').value), phone = digits($('qPhone').value);
+  if (!sid || !phone) { toast('학번과 연락처를 입력해주세요.', true); return; }
+  $('qResult').innerHTML = '<span class="muted">조회 중…</span>';
+  try {
+    const r = await run('lookup', { studentId: sid, phone });
+    lastQuery = { sid, phone };
+    $('qResult').innerHTML = r
+      ? `<b>${esc(r.name)}</b> 님의 면접: <b style="color:var(--p)">${esc(r.label)}</b>
+         <button class="btn red" style="padding:6px 12px;font-size:13px;margin-left:8px" onclick="askCancel('${esc(r.label)}')">예약 취소</button>`
+      : '<span style="color:var(--red)">일치하는 예약이 없습니다.</span>';
+  } catch (e) { $('qResult').textContent = ''; toast(e.message, true); }
+}
+
+function askCancel(label) {
+  modal('예약을 취소할까요?', `<b>${label}</b> 예약이 취소되며, 해당 자리는 다른 지원자가 예약할 수 있게 됩니다.`, '예약 취소', 'red', async () => {
+    $('mOk').disabled = true; $('mOk').textContent = '처리 중…';
+    try {
+      await run('cancel', { studentId: lastQuery.sid, phone: lastQuery.phone });
+      closeModal(); $('qResult').innerHTML = '<span style="color:var(--ok)">예약이 취소되었습니다.</span>';
+      toast('예약이 취소되었습니다.'); refresh(true, true);
+    } catch (e) { closeModal(); toast(e.message, true); }
+  });
+}
+
+function toggleAdmin() { const v = $('adminView'); v.style.display = v.style.display === 'none' ? 'block' : 'none'; if (v.style.display === 'block') v.scrollIntoView(); }
+
+async function loadAdmin() {
+  $('adminOut').innerHTML = '<div class="loading">불러오는 중…</div>';
+  try {
+    const r = await run('adminData', { password: $('pw').value });
+    $('adminOut').innerHTML = `
+      <p style="margin:14px 0 8px">예약 <b>${r.total}</b>명 / 전체 정원 ${r.capacityTotal}명</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn" href="${r.exportUrl}" target="_blank">엑셀(.xlsx) 다운로드</a>
+        <a class="btn ghost" href="${r.sheetUrl}" target="_blank">구글 시트 열기</a>
+      </div>
+      <p class="muted">※ 엑셀 다운로드·시트 열기는 시트 공유 권한이 있는 구글 계정으로 로그인된 브라우저에서만 됩니다. '시간순명단' 탭이 날짜·시간순 정렬본입니다.</p>
+      <div class="tbl"><table><thead><tr><th>#</th><th>날짜</th><th>요일</th><th>시간</th><th>이름</th><th>학번</th><th>학과</th><th>연락처</th><th>예약일시</th></tr></thead>
+      <tbody>${r.rows.map(x => '<tr>' + x.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('')}</tbody></table></div>`;
+  } catch (e) { $('adminOut').innerHTML = ''; toast(e.message, true); }
+}
+
+refresh();
+setInterval(() => { if (!document.hidden && !busy && $('modal').style.display !== 'flex') refresh(true); }, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
+</script>
+</body>
+</html>
