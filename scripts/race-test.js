@@ -15,7 +15,11 @@ async function call(action, payload = {}) {
       ? await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ ...payload, action, secret: GAS_SECRET }), redirect: 'follow' })
       : await fetch(`${BASE_URL}/api/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const text = await r.text();
-    try { return JSON.parse(text); } catch { return { ok: false, error: `JSON 아님 (HTTP ${r.status}) ${text.slice(0, 200)}` }; }
+    let j;
+    try { j = JSON.parse(text); } catch { return { ok: false, error: `JSON 아님 (HTTP ${r.status}) ${text.slice(0, 200)}` }; }
+    // 우리 API가 아닌 응답(예: Vercel 배포 보호 401)은 error가 객체라 원문을 보여준다
+    if (typeof j.ok !== 'boolean') return { ok: false, error: `예상 밖 응답 (HTTP ${r.status}) ${text.slice(0, 200)}` };
+    return j;
   } catch (e) { return { ok: false, error: e.message }; }
 }
 const state = async () => { const r = await call('getState'); if (!r.ok) throw new Error('getState 실패: ' + r.error); return r.data; };
