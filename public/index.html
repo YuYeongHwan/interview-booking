@@ -11,6 +11,8 @@
   .wrap{max-width:720px;margin:0 auto;padding:20px 16px}
   header h1{font-size:22px;margin:8px 0 6px}
   header p{margin:0;color:var(--sub);font-size:14px;line-height:1.6}
+  .notice{white-space:pre-line;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:12px;padding:14px 16px;margin:10px 0 12px;font-size:14px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}
+  .notice a{color:#b91c1c;font-weight:700;text-decoration:underline}
   .card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:18px;margin-top:16px}
   .card h2{font-size:16px;margin:0 0 14px;display:flex;align-items:center;gap:8px}
   .step{background:var(--p);color:#fff;border-radius:50%;width:22px;height:22px;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
@@ -33,6 +35,9 @@
   .slot.on small{color:#dbe6ff}
   .slot:disabled{background:#f3f4f6;color:#b6bcc6;cursor:not-allowed;text-decoration:line-through}
   .slot:disabled small{text-decoration:none;color:var(--red)}
+  .slot.extra{border:2px dashed #93a8d8;background:#f8faff}
+  .slot.extra.on{background:var(--p);border-color:var(--p)}
+  .slot.extra:disabled{text-decoration:none}
   .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--bd);padding:12px 16px}
   .bar .in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
   .bar .sel{flex:1;font-size:14px;color:var(--sub)}
@@ -70,6 +75,14 @@
 <div class="wrap">
   <header>
     <h1 id="title">국제기술봉사단 면접 일정 예약</h1>
+    <div class="notice">본 페이지는 '제29기 국제기술봉사단' 에 지원해주신 학생을 대상으로, 대면 면접 일정을 조율하기 위함입니다.
+학생분들은 본인이 면접 가능한 시간 1개를 선택(예약)해 주시고, 추후 확정된 면접일정을 홈페이지 공지를 통해 확인해주시기 바랍니다.
+
+*본 페이지에서 면접 시간을 예약하지 않은 지원자는, 면접에 미참여 하는 것으로 확인합니다.
+
+문의: 동서대학교 사회봉사센터 <a href="tel:051-320-2044">051-320-2044</a>
+
+※ 입력하신 개인정보(이름, 학번, 학과, 연락처)는 면접 일정 조율 목적으로만 사용되며, 면접 종료 후 삭제됩니다.</div>
     <p>면접 기간: 11월 23일(월) ~ 27일(금) · 13:20 ~ 17:00<br>20분 단위 · 시간대별 4명 · 1인 1회 예약</p>
   </header>
   <div class="banner" id="banner"></div>
@@ -150,6 +163,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const md = d => { const [, m, dd] = d.split('-').map(Number); return m + '/' + dd; };
 const digits = s => String(s || '').replace(/\D/g, '');
+const isUnlimited = t => !!(S && S.extraSlot && S.extraSlot.unlimited && t === S.extraSlot.key);
 
 // /api/[action] 호출. 성공 시 data 반환, 실패 시 한글 메시지로 throw
 async function run(action, payload, opts = {}) {
@@ -173,7 +187,7 @@ async function refresh(silent, fresh) {
   try {
     S = await run('getState', null, { get: true, fresh });
     if (!sel.date) sel.date = S.dates[0].date;
-    if (sel.time) {
+    if (sel.time && !isUnlimited(sel.time)) {
       const n = S.counts[sel.date + '|' + sel.time] || 0;
       if (n >= S.capacity) { sel.time = null; toast('선택한 시간이 방금 마감되었습니다. 다른 시간을 골라주세요.', true); }
     }
@@ -200,6 +214,13 @@ function render() {
     return `<button class="slot ${on ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${t}')">
       ${t}<small>${full ? '마감' : '잔여 ' + left + ' / ' + S.capacity}</small></button>`;
   }).join('');
+  // 추가 칸(예: 17:00 이후 가능): 정원 제한이 없으면 마감되지 않음. 오픈/마감 시각만 적용
+  const x = S.extraSlot;
+  if (x) {
+    const n = S.counts[sel.date + '|' + x.key] || 0, full = !x.unlimited && n >= S.capacity;
+    $('times').innerHTML += `<button class="slot extra ${sel.time === x.key ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${esc(x.key)}')">
+      ${esc(x.label)}<small>${x.unlimited ? '인원 제한 없음' : full ? '마감' : '잔여 ' + (S.capacity - n) + ' / ' + S.capacity}</small></button>`;
+  }
 
   const d = S.dates.find(x => x.date === sel.date);
   if (sel.time) { $('selText').innerHTML = '선택: <b>' + md(sel.date) + ' (' + d.dow + ') ' + sel.time + '</b>'; }

@@ -6,6 +6,8 @@ const CONFIG = {
   END: '17:00',            // 마지막 면접 종료
   INTERVAL_MIN: 20,        // 간격(분)
   CAPACITY: 4,             // 시간대당 정원
+  // 각 날짜 마지막에 붙는 추가 칸. key는 시트 '면접시간' 열에 저장되는 값. 필요 없으면 null.
+  EXTRA_SLOT: { key: '17:00 이후', label: '17:00 이후 가능', unlimited: true },
   OPEN_AT: '',             // 예약 오픈 시각. 예: '2026-11-18T18:00:00+09:00' (비우면 즉시 오픈)
   CLOSE_AT: '',            // 예약 마감 시각. 예: '2026-11-21T23:59:59+09:00' (비우면 마감 없음)
   SHEET: '예약명단',
@@ -83,6 +85,12 @@ function times_() {
   return out;
 }
 
+// 예약 가능한 모든 칸(정원 있는 칸 + 추가 칸), 정렬 순서 겸용
+function slots_() {
+  return CONFIG.EXTRA_SLOT ? times_().concat(CONFIG.EXTRA_SLOT.key) : times_();
+}
+const isUnlimited_ = time => !!(CONFIG.EXTRA_SLOT && CONFIG.EXTRA_SLOT.unlimited && time === CONFIG.EXTRA_SLOT.key);
+
 function dow_(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return DOW[new Date(y, m - 1, d).getDay()];
@@ -99,8 +107,10 @@ function normDate_(s) {
   const m = String(s).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
   return m ? `${m[1]}-${pad2_(m[2])}-${pad2_(m[3])}` : String(s).trim();
 }
-// '13:20', '13:20:00', '오후 1:20:00' → '13:20'
+// '13:20', '13:20:00', '오후 1:20:00' → '13:20'. '17:00이후', '17:00 이후 가능' → EXTRA_SLOT.key
 function normTime_(s) {
+  const ex = CONFIG.EXTRA_SLOT, flat = String(s).replace(/\s/g, '');
+  if (ex && (flat === ex.key.replace(/\s/g, '') || flat === ex.label.replace(/\s/g, ''))) return ex.key;
   const m = String(s).match(/(\d{1,2}):(\d{2})/);
   if (!m) return String(s).trim();
   let h = Number(m[1]);
@@ -178,6 +188,7 @@ function getState() {
     dates: CONFIG.DATES.map(d => ({ date: d, dow: dow_(d) })),
     times: times_(),
     capacity: CONFIG.CAPACITY,
+    extraSlot: CONFIG.EXTRA_SLOT || null,   // 프론트가 각 날짜 마지막에 그린다
     counts: countMap_(rows_(sheet_())),   // 인원 수만. 이름 등 개인정보는 절대 내보내지 않음
     status: status_(),
     openAt: CONFIG.OPEN_AT,
@@ -197,7 +208,7 @@ function reserve(form) {
   if (name.length > 30 || major.length > 40) fail_('입력값이 너무 깁니다.');
   if (!/^\d{6,10}$/.test(sid)) fail_('학번을 정확히 입력해주세요.');
   if (!/^01\d{8,9}$/.test(phoneDigits)) fail_('연락처를 정확히 입력해주세요. (예: 010-1234-5678)');
-  if (CONFIG.DATES.indexOf(date) < 0 || times_().indexOf(time) < 0) fail_('잘못된 시간대입니다.');
+  if (CONFIG.DATES.indexOf(date) < 0 || slots_().indexOf(time) < 0) fail_('잘못된 시간대입니다.');
 
   const st = status_();
   if (st === 'before') fail_('아직 예약 시작 전입니다.');
@@ -216,7 +227,7 @@ function reserve(form) {
       fail_(`이미 예약된 학번입니다. (${fmt_(dup.date, dup.time)})\n변경하려면 '내 예약 확인 / 취소'에서 취소 후 다시 예약해주세요.`);
     }
     const cnt = rows.filter(r => r.date === date && r.time === time).length;
-    if (cnt >= CONFIG.CAPACITY) fail_('방금 해당 시간이 마감되었습니다. 다른 시간을 선택해주세요.');
+    if (!isUnlimited_(time) && cnt >= CONFIG.CAPACITY) fail_('방금 해당 시간이 마감되었습니다. 다른 시간을 선택해주세요.');
 
     const rec = {
       ts: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'),
@@ -284,8 +295,11 @@ function adminData(pw) {
 
 /* 날짜 → 시간 → 예약순으로 정렬한 명단 시트 생성 (엑셀 다운로드용) */
 function refreshSortedSheet() {
+  // 날짜 → 칸 순서(13:20 … 16:40, 17:00 이후, 그 외 값은 맨 뒤) → 예약일시
+  const order = slots_();
+  const pos = t => { const i = order.indexOf(t); return i < 0 ? order.length : i; };
   const rows = rows_(sheet_()).sort((a, b) =>
-    (a.date + a.time + a.ts).localeCompare(b.date + b.time + b.ts));
+    a.date.localeCompare(b.date) || pos(a.time) - pos(b.time) || a.time.localeCompare(b.time) || a.ts.localeCompare(b.ts));
   const out = rows.map((r, i) => [i + 1, r.date, r.dow, r.time, r.name, r.sid, r.major, r.phone, r.ts]);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
