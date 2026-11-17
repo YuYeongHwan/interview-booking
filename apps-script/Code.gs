@@ -7,7 +7,8 @@ const CONFIG = {
   INTERVAL_MIN: 20,        // 간격(분)
   CAPACITY: 4,             // 시간대당 정원
   // 각 날짜 마지막에 붙는 추가 칸. key는 시트 '면접시간' 열에 저장되는 값. 필요 없으면 null.
-  EXTRA_SLOT: { key: '17:00 이후', label: '17:00 이후 가능', capacity: 8 },
+  // aliases: 예전 저장값/직접 입력 변형도 같은 칸으로 인식 (공백 무시, '-'는 '~'로 취급)
+  EXTRA_SLOT: { key: '17:00~17:30', label: '17:00~17:30', capacity: 8, aliases: ['17:00 이후', '17:00 이후 가능'] },
   OPEN_AT: '',             // 예약 오픈 시각. 예: '2026-11-18T18:00:00+09:00' (비우면 즉시 오픈)
   CLOSE_AT: '2026-11-20T13:00:00+09:00',  // 예약 마감 시각 (비우면 마감 없음). 반드시 +09:00 형식
   SHEET: '예약명단',
@@ -111,10 +112,10 @@ function normDate_(s) {
   const m = String(s).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
   return m ? `${m[1]}-${pad2_(m[2])}-${pad2_(m[3])}` : String(s).trim();
 }
-// '13:20', '13:20:00', '오후 1:20:00' → '13:20'. '17:00이후', '17:00 이후 가능' → EXTRA_SLOT.key
+// '13:20', '13:20:00', '오후 1:20:00' → '13:20'. '17:00 이후', '17:00-17:30', '17:00 ~ 17:30' → EXTRA_SLOT.key
 function normTime_(s) {
-  const ex = CONFIG.EXTRA_SLOT, flat = String(s).replace(/\s/g, '');
-  if (ex && (flat === ex.key.replace(/\s/g, '') || flat === ex.label.replace(/\s/g, ''))) return ex.key;
+  const ex = CONFIG.EXTRA_SLOT, flatOf = x => String(x).replace(/\s/g, '').replace(/[-–]/g, '~');
+  if (ex && [ex.key, ex.label].concat(ex.aliases || []).map(flatOf).indexOf(flatOf(s)) >= 0) return ex.key;
   const m = String(s).match(/(\d{1,2}):(\d{2})/);
   if (!m) return String(s).trim();
   let h = Number(m[1]);
@@ -302,7 +303,7 @@ function adminData(pw) {
 
 /* 날짜 → 시간 → 예약순으로 정렬한 명단 시트 생성 (엑셀 다운로드용) */
 function refreshSortedSheet() {
-  // 날짜 → 칸 순서(13:20 … 16:40, 17:00 이후, 그 외 값은 맨 뒤) → 예약일시
+  // 날짜 → 칸 순서(13:20 … 16:40, 17:00~17:30, 그 외 값은 맨 뒤) → 예약일시
   const order = slots_();
   const pos = t => { const i = order.indexOf(t); return i < 0 ? order.length : i; };
   const rows = rows_(sheet_()).sort((a, b) =>

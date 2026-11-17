@@ -85,7 +85,7 @@
 문의: 동서대학교 사회봉사센터 <a href="tel:051-320-2044">051-320-2044</a>
 
 ※ 입력하신 개인정보(이름, 학번, 학과, 연락처)는 면접 일정 조율 목적으로만 사용되며, 면접 종료 후 삭제됩니다.</div>
-    <p>면접 기간: 11월 23일(월) ~ 27일(금) · 13:20 ~ 17:00<br>20분 단위 · 시간대별 4명(17:00 이후 8명) · 1인 1회 예약</p>
+    <p>면접 기간: 11월 23일(월) ~ 27일(금) · 13:20 ~ 17:00<br>20분 단위 · 시간대별 4명(17:00~17:30 8명) · 1인 1회 예약</p>
     <p class="close-info" id="closeInfo"></p>
   </header>
   <div class="banner" id="banner"></div>
@@ -213,7 +213,7 @@ function render() {
 
   const open = S.status === 'open';
   $('closeInfo').textContent = S.closeLabel ? '예약 마감: ' + S.closeLabel : '';
-  // 칸 목록·칸별 정원은 서버가 정한다 (추가 칸 '17:00 이후 가능'은 점선 스타일)
+  // 칸 목록·칸별 정원은 서버가 정한다 (추가 칸 '17:00~17:30'은 점선 스타일)
   $('times').innerHTML = S.slots.map(s => {
     const n = S.counts[sel.date + '|' + s.key] || 0, left = s.capacity - n, full = left <= 0;
     return `<button class="slot ${s.extra ? 'extra' : ''} ${sel.time === s.key ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${esc(s.key)}')">
