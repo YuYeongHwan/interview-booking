@@ -12,7 +12,7 @@
 - 응답 형식: `{ok:true, data}` / `{ok:false, error:"한글 메시지"}`. 사용자용 오류는 `fail_()`로 던진다.
 - 비밀값: GAS 스크립트 속성 `API_SECRET`, `ADMIN_PASSWORD`. Vercel 환경변수 `GAS_URL`, `GAS_SECRET`. 코드/git에 넣지 말 것.
 - 설정(날짜/시간/정원/OPEN_AT/CLOSE_AT): `Code.gs`의 `CONFIG`. 마감 2026-11-20 13:00.
-- 칸: 13:20~16:40(정원 `CAPACITY`=4) + `EXTRA_SLOT` '17:00~17:30'(정원 `EXTRA_SLOT.capacity`=8, 예전 값 '17:00 이후'는 `aliases`로 같은 칸 인식). 칸별 정원은 `capOf_()`, 프론트는 `getState.slots`만 사용(정원 하드코딩 금지).
+- 칸: 13:20~16:40(정원 `CAPACITY`=4) + `EXTRA_SLOT` '17:00~17:30'(정원 `EXTRA_SLOT.capacity`=8, 예전 값 '17:00 이후'는 `aliases`로 같은 칸 인식). 칸별 정원은 `capOf_()`. 날짜별 운영 칸은 `slotsOf_(date)`(`DISABLED_SLOTS` 제외) → `getState.dates[].slots`, 프론트는 이것만 사용(정원·칸 하드코딩 금지). 비활성 칸 예약은 락 안에서 거부, 기존 행은 유지·관리자 화면에 강조.
 - 테스트 시각 주입: mock에서 `MOCK_NOW=2026-11-20T13:00:01+09:00` → `now_()` 대체.
 
 ## 동시성 (중요)

@@ -23,6 +23,8 @@ async function call(action, payload = {}) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 const state = async () => { const r = await call('getState'); if (!r.ok) throw new Error('getState 실패: ' + r.error); return r.data; };
+// 날짜별 운영 칸(비활성 칸 제외). 옛 서버면 전체 칸
+const offered = (d, key) => (d.slots ? d.slots.some(s => s.key === key) : true);
 const person = n => ({ name: `테스트${n}`, studentId: `9999${String(n).padStart(4, '0')}`, major: '테스트학과', phone: `0109999${String(n).padStart(4, '0')}` });
 
 const S = await state();
@@ -48,7 +50,7 @@ try {
   let date, time;
   if (SLOT) [date, time] = SLOT.split('|');
   else outer: for (const d of [...S.dates].reverse()) for (const t of [...S.times].reverse()) {
-    if (!S.counts[d.date + '|' + t]) { date = d.date; time = t; break outer; }
+    if (offered(d, t) && !S.counts[d.date + '|' + t]) { date = d.date; time = t; break outer; }
   }
   if (!date) throw new Error('빈 시간대가 없습니다. SLOT=날짜|시간 으로 지정하세요.');
   const before = S.counts[date + '|' + time] || 0, expected = Math.max(0, S.capacity - before);
@@ -61,7 +63,8 @@ try {
   const x = (S.slots || []).find(s => s.extra);
   if (!x) console.log('\n[B] 추가 칸이 설정되지 않아 건너뜀');
   else {
-    const xd = S.dates[S.dates.length - 1].date, xb = S.counts[xd + '|' + x.key] || 0;
+    // 추가 칸을 운영하는 마지막 날짜 (예: 11/27이 비활성이면 11/26)
+    const xd = [...S.dates].reverse().find(d => offered(d, x.key)).date, xb = S.counts[xd + '|' + x.key] || 0;
     const xe = Math.min(N, Math.max(0, x.capacity - xb));
     console.log(`\n[B] 추가 칸 ${xd} ${x.key} (기존 ${xb}명, 정원 ${x.capacity}) → 기대 성공 ${xe}건`);
     const okB = await burst(Array.from({ length: N }, (_, i) => person(100 + i)), xd, x.key);

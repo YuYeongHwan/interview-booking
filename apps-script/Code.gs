@@ -9,6 +9,8 @@ const CONFIG = {
   // 각 날짜 마지막에 붙는 추가 칸. key는 시트 '면접시간' 열에 저장되는 값. 필요 없으면 null.
   // aliases: 예전 저장값/직접 입력 변형도 같은 칸으로 인식 (공백 무시, '-'는 '~'로 취급)
   EXTRA_SLOT: { key: '17:00~17:30', label: '17:00~17:30', capacity: 8, aliases: ['17:00 이후', '17:00 이후 가능'] },
+  // 운영하지 않는 칸(날짜별). 화면에서 빠지고 예약 거부, 정원 집계 제외. 기존 예약 행은 그대로 둔다.
+  DISABLED_SLOTS: [{ date: '2026-11-27', time: '17:00~17:30' }],
   OPEN_AT: '',             // 예약 오픈 시각. 예: '2026-11-18T18:00:00+09:00' (비우면 즉시 오픈)
   CLOSE_AT: '2026-11-20T13:00:00+09:00',  // 예약 마감 시각 (비우면 마감 없음). 반드시 +09:00 형식
   SHEET: '예약명단',
@@ -93,6 +95,10 @@ function slots_() {
 const isExtra_ = time => !!(CONFIG.EXTRA_SLOT && time === CONFIG.EXTRA_SLOT.key);
 // 칸별 정원: 추가 칸은 EXTRA_SLOT.capacity, 나머지는 CAPACITY
 const capOf_ = time => (CONFIG.EXTRA_SLOT && time === CONFIG.EXTRA_SLOT.key ? CONFIG.EXTRA_SLOT.capacity : CONFIG.CAPACITY);
+// 비활성 칸 여부 / 날짜별로 운영하는 칸 목록
+const isDisabled_ = (date, time) => (CONFIG.DISABLED_SLOTS || []).some(x => x.date === date && normTime_(x.time) === time);
+const slotsOf_ = date => slots_().filter(t => !isDisabled_(date, t));
+const slotInfo_ = t => ({ key: t, label: isExtra_(t) ? CONFIG.EXTRA_SLOT.label : t, capacity: capOf_(t), extra: isExtra_(t) });
 // 테스트에서 현재 시각을 바꿀 수 있도록 분리 (mock의 MOCK_NOW)
 function now_() { return new Date(); }
 
@@ -190,12 +196,13 @@ function lock_() {
 function getState() {
   return {
     title: CONFIG.TITLE,
-    dates: CONFIG.DATES.map(d => ({ date: d, dow: dow_(d) })),
+    // 날짜별 칸 목록(비활성 칸 제외). 프론트는 이것으로 칸을 그린다
+    dates: CONFIG.DATES.map(d => ({ date: d, dow: dow_(d), slots: slotsOf_(d).map(slotInfo_) })),
     times: times_(),
     capacity: CONFIG.CAPACITY,
     extraSlot: CONFIG.EXTRA_SLOT || null,
-    // 프론트는 이 목록으로 칸을 그린다 (칸별 정원 포함, 추가 칸은 맨 뒤)
-    slots: slots_().map(t => ({ key: t, label: isExtra_(t) ? CONFIG.EXTRA_SLOT.label : t, capacity: capOf_(t), extra: isExtra_(t) })),
+    // 전체 칸 정의(칸별 정원 포함, 추가 칸은 맨 뒤). 날짜별 운영 여부는 dates[].slots
+    slots: slots_().map(slotInfo_),
     closeLabel: CONFIG.CLOSE_AT ? fmt_(CONFIG.CLOSE_AT.slice(0, 10), CONFIG.CLOSE_AT.slice(11, 16)) : '',
     counts: countMap_(rows_(sheet_())),   // 인원 수만. 이름 등 개인정보는 절대 내보내지 않음
     status: status_(),
@@ -234,6 +241,8 @@ function reserve(form) {
     if (dup) {
       fail_(`이미 예약된 학번입니다. (${fmt_(dup.date, dup.time)})\n변경하려면 '내 예약 확인 / 취소'에서 취소 후 다시 예약해주세요.`);
     }
+    // 옛 화면에서 들어온 요청도 막는다
+    if (isDisabled_(date, time)) fail_('선택할 수 없는 시간입니다.');
     const cnt = rows.filter(r => r.date === date && r.time === time).length;
     if (cnt >= capOf_(time)) fail_('방금 해당 시간이 마감되었습니다. 다른 시간을 선택해주세요.');
 
@@ -292,10 +301,16 @@ function adminData(pw) {
   }
   const sorted = refreshSortedSheet();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // 비활성 칸에 이미 들어가 있는 예약 (행은 지우지 않음, 관리자 화면에서 강조)
+  const disabled = (CONFIG.DISABLED_SLOTS || []).map(x => {
+    const time = normTime_(x.time);
+    return { key: x.date + '|' + time, label: fmt_(x.date, time), count: sorted.filter(r => r[1] === x.date && r[3] === time).length };
+  });
   return {
     rows: sorted,
     total: sorted.length,
-    capacityTotal: CONFIG.DATES.length * slots_().reduce((a, t) => a + capOf_(t), 0),
+    capacityTotal: CONFIG.DATES.reduce((a, d) => a + slotsOf_(d).reduce((b, t) => b + capOf_(t), 0), 0),
+    disabled,
     exportUrl: `https://docs.google.com/spreadsheets/d/${ss.getId()}/export?format=xlsx`,
     sheetUrl: ss.getUrl()
   };
