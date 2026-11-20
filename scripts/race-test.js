@@ -24,7 +24,7 @@ async function call(action, payload = {}) {
 }
 const state = async () => { const r = await call('getState'); if (!r.ok) throw new Error('getState 실패: ' + r.error); return r.data; };
 // 날짜별 운영 칸(비활성 칸 제외). 옛 서버면 전체 칸
-const offered = (d, key) => (d.slots ? d.slots.some(s => s.key === key) : true);
+const offered = (d, key) => !d.closed && (d.slots ? d.slots.some(s => s.key === key) : true);
 const person = n => ({ name: `테스트${n}`, studentId: `9999${String(n).padStart(4, '0')}`, major: '테스트학과', phone: `0109999${String(n).padStart(4, '0')}` });
 
 const S = await state();

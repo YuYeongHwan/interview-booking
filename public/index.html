@@ -196,7 +196,7 @@ async function refresh(silent, fresh) {
     S = await run('getState', null, { get: true, fresh });
     if (!sel.date) sel.date = S.dates[0].date;
     const day = S.dates.find(x => x.date === sel.date);
-    if (sel.time && !daySlots(day).some(s => s.key === sel.time)) sel.time = null;
+    if (sel.time && (day.closed || !daySlots(day).some(s => s.key === sel.time))) sel.time = null;
     if (sel.time) {
       const n = S.counts[sel.date + '|' + sel.time] || 0;
       if (n >= capOf(sel.time)) { sel.time = null; toast('선택한 시간이 방금 마감되었습니다. 다른 시간을 골라주세요.', true); }
@@ -212,7 +212,7 @@ function render() {
   else b.style.display = 'none';
 
   $('days').innerHTML = S.dates.map(d => {
-    const left = daySlots(d).reduce((a, s) => a + Math.max(0, s.capacity - (S.counts[d.date + '|' + s.key] || 0)), 0);
+    const left = d.closed ? 0 : daySlots(d).reduce((a, s) => a + Math.max(0, s.capacity - (S.counts[d.date + '|' + s.key] || 0)), 0);
     return `<button class="day ${d.date === sel.date ? 'on' : ''} ${left === 0 ? 'full' : ''}" onclick="pickDay('${d.date}')">
       <b>${md(d.date)} (${d.dow})</b><small>${left === 0 ? '마감' : '잔여 ' + left + '석'}</small></button>`;
   }).join('');
@@ -220,8 +220,9 @@ function render() {
   const open = S.status === 'open';
   $('closeInfo').textContent = S.closeLabel ? '예약 마감: ' + S.closeLabel : '';
   // 칸 목록·칸별 정원은 서버가 정한다 (추가 칸 '17:00~17:30'은 점선 스타일)
-  $('times').innerHTML = daySlots(S.dates.find(x => x.date === sel.date)).map(s => {
-    const n = S.counts[sel.date + '|' + s.key] || 0, left = s.capacity - n, full = left <= 0;
+  const cur = S.dates.find(x => x.date === sel.date);
+  $('times').innerHTML = daySlots(cur).map(s => {
+    const n = S.counts[sel.date + '|' + s.key] || 0, left = s.capacity - n, full = cur.closed || left <= 0;
     return `<button class="slot ${s.extra ? 'extra' : ''} ${sel.time === s.key ? 'on' : ''}" ${full || !open ? 'disabled' : ''} onclick="pickTime('${esc(s.key)}')">
       ${esc(s.label)}<small>${full ? '마감' : '잔여 ' + left + ' / ' + s.capacity}</small></button>`;
   }).join('');
@@ -317,8 +318,10 @@ async function loadAdmin() {
   try {
     const r = await run('adminData', { password: $('pw').value });
     const off = new Set((r.disabled || []).map(x => x.key));
+    const offDate = new Set((r.closedDates || []).map(x => x.date));
     const warn = (r.disabled || []).filter(x => x.count > 0)
-      .map(x => `<p class="warn">⚠ 운영하지 않는 칸 <b>${esc(x.label)}</b>에 예약자 <b>${x.count}명</b>이 있습니다. 아래 표에서 빨간 줄로 표시됩니다. 개별 연락이 필요합니다.</p>`).join('');
+      .map(x => `<p class="warn">⚠ 운영하지 않는 칸 <b>${esc(x.label)}</b>에 예약자 <b>${x.count}명</b>이 있습니다. 아래 표에서 빨간 줄로 표시됩니다. 개별 연락이 필요합니다.</p>`).join('')
+      + (r.closedDates || []).map(x => `<p class="warn">⚠ 접수 마감 날짜 <b>${esc(x.label)}</b> 예약자 <b>${x.count}명</b>${x.count ? ' (아래 표 빨간 줄)' : ''}</p>`).join('');
     $('adminOut').innerHTML = `
       <p style="margin:14px 0 8px">예약 <b>${r.total}</b>명 / 전체 정원 ${r.capacityTotal}명</p>${warn}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -327,7 +330,7 @@ async function loadAdmin() {
       </div>
       <p class="muted">※ 엑셀 다운로드·시트 열기는 시트 공유 권한이 있는 구글 계정으로 로그인된 브라우저에서만 됩니다. '시간순명단' 탭이 날짜·시간순 정렬본입니다.</p>
       <div class="tbl"><table><thead><tr><th>#</th><th>날짜</th><th>요일</th><th>시간</th><th>이름</th><th>학번</th><th>학과</th><th>연락처</th><th>예약일시</th></tr></thead>
-      <tbody>${r.rows.map(x => '<tr' + (off.has(x[1] + '|' + x[3]) ? ' class="off"' : '') + '>' + x.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('')}</tbody></table></div>`;
+      <tbody>${r.rows.map(x => '<tr' + (off.has(x[1] + '|' + x[3]) || offDate.has(x[1]) ? ' class="off"' : '') + '>' + x.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('')}</tbody></table></div>`;
   } catch (e) { $('adminOut').innerHTML = ''; toast(e.message, true); }
 }
 

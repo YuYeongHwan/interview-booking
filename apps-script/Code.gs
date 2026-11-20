@@ -11,6 +11,8 @@ const CONFIG = {
   EXTRA_SLOT: { key: '17:00~17:30', label: '17:00~17:30', capacity: 8, aliases: ['17:00 이후', '17:00 이후 가능'] },
   // 운영하지 않는 칸(날짜별). 화면에서 빠지고 예약 거부, 정원 집계 제외. 기존 예약 행은 그대로 둔다.
   DISABLED_SLOTS: [{ date: '2026-11-27', time: '17:00~17:30' }],
+  // 날짜 전체 접수 마감. 탭은 보이되 모든 칸 '마감', 예약 거부, 정원 집계 제외. 기존 예약 조회·취소는 가능.
+  CLOSED_DATES: ['2026-11-27'],
   OPEN_AT: '',             // 예약 오픈 시각. 예: '2026-11-18T18:00:00+09:00' (비우면 즉시 오픈)
   CLOSE_AT: '2026-11-20T13:00:00+09:00',  // 예약 마감 시각 (비우면 마감 없음). 반드시 +09:00 형식
   SHEET: '예약명단',
@@ -97,6 +99,7 @@ const isExtra_ = time => !!(CONFIG.EXTRA_SLOT && time === CONFIG.EXTRA_SLOT.key)
 const capOf_ = time => (CONFIG.EXTRA_SLOT && time === CONFIG.EXTRA_SLOT.key ? CONFIG.EXTRA_SLOT.capacity : CONFIG.CAPACITY);
 // 비활성 칸 여부 / 날짜별로 운영하는 칸 목록
 const isDisabled_ = (date, time) => (CONFIG.DISABLED_SLOTS || []).some(x => x.date === date && normTime_(x.time) === time);
+const isDateClosed_ = date => (CONFIG.CLOSED_DATES || []).indexOf(date) >= 0;
 const slotsOf_ = date => slots_().filter(t => !isDisabled_(date, t));
 const slotInfo_ = t => ({ key: t, label: isExtra_(t) ? CONFIG.EXTRA_SLOT.label : t, capacity: capOf_(t), extra: isExtra_(t) });
 // 테스트에서 현재 시각을 바꿀 수 있도록 분리 (mock의 MOCK_NOW)
@@ -197,7 +200,7 @@ function getState() {
   return {
     title: CONFIG.TITLE,
     // 날짜별 칸 목록(비활성 칸 제외). 프론트는 이것으로 칸을 그린다
-    dates: CONFIG.DATES.map(d => ({ date: d, dow: dow_(d), slots: slotsOf_(d).map(slotInfo_) })),
+    dates: CONFIG.DATES.map(d => ({ date: d, dow: dow_(d), closed: isDateClosed_(d), slots: slotsOf_(d).map(slotInfo_) })),
     times: times_(),
     capacity: CONFIG.CAPACITY,
     extraSlot: CONFIG.EXTRA_SLOT || null,
@@ -242,6 +245,7 @@ function reserve(form) {
       fail_(`이미 예약된 학번입니다. (${fmt_(dup.date, dup.time)})\n변경하려면 '내 예약 확인 / 취소'에서 취소 후 다시 예약해주세요.`);
     }
     // 옛 화면에서 들어온 요청도 막는다
+    if (isDateClosed_(date)) fail_('해당 날짜는 접수가 마감되었습니다.');
     if (isDisabled_(date, time)) fail_('선택할 수 없는 시간입니다.');
     const cnt = rows.filter(r => r.date === date && r.time === time).length;
     if (cnt >= capOf_(time)) fail_('방금 해당 시간이 마감되었습니다. 다른 시간을 선택해주세요.');
@@ -306,10 +310,13 @@ function adminData(pw) {
     const time = normTime_(x.time);
     return { key: x.date + '|' + time, label: fmt_(x.date, time), count: sorted.filter(r => r[1] === x.date && r[3] === time).length };
   });
+  // 접수 마감 날짜의 기존 예약자 수
+  const closedDates = (CONFIG.CLOSED_DATES || []).map(d => ({ date: d, label: fmt_(d, '').trim(), count: sorted.filter(r => r[1] === d).length }));
   return {
     rows: sorted,
+    closedDates,
     total: sorted.length,
-    capacityTotal: CONFIG.DATES.reduce((a, d) => a + slotsOf_(d).reduce((b, t) => b + capOf_(t), 0), 0),
+    capacityTotal: CONFIG.DATES.filter(d => !isDateClosed_(d)).reduce((a, d) => a + slotsOf_(d).reduce((b, t) => b + capOf_(t), 0), 0),
     disabled,
     exportUrl: `https://docs.google.com/spreadsheets/d/${ss.getId()}/export?format=xlsx`,
     sheetUrl: ss.getUrl()
